@@ -1,4 +1,4 @@
-module adaptstore
+module github.com/rawbytedev/aether
 
 go 1.25.2
 
