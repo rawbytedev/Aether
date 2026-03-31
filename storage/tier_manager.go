@@ -1,11 +1,13 @@
 package storage
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rawbytedev/zerokv"
 	"github.com/rawbytedev/zerokv/badgerdb"
 	"github.com/rawbytedev/zerokv/pebbledb"
+	//"github.com/rawbytedev/zerokv/memdb"
 )
 
 // TierType represents the type of storage tier
@@ -31,21 +33,25 @@ type Tier struct {
 type Tconfigs struct {
 	Dir string
 }
+
 // TierConfigs represents the configuration for all storage tiers
 type TierConfigs struct {
 	ConfigName string
-	Tiers      []Tier // only requires DBname
+	Tiers      []*Tier // only requires DBname
 }
+
 // TierManager manages multiple storage tiers
 type TierManager struct {
-	dbs map[string]*Tier
+	dbs map[TierType]*Tier
 }
+
 // NewTierManager creates a new TierManager with the given configuration
 func NewTierManager(config TierConfigs) (*TierManager, error) {
 	fmt.Printf("Using %s config", config.ConfigName)
 	Manager := &TierManager{}
+	Manager.dbs = make(map[TierType]*Tier, 10)
 	for _, tier := range config.Tiers {
-		Manager.dbs[string(tier.IType)] = &tier
+		Manager.dbs[tier.IType] = tier
 	}
 	return Manager, nil
 }
@@ -61,6 +67,61 @@ func (tm *TierManager) Initialize() (bool, error) {
 	}
 	return true, nil
 }
+
+func (tm *TierManager) Put(ctx context.Context, tier TierType, key []byte, value []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return tm.dbs[tier].IStore.Put(ctx, key, value)
+}
+func (tm *TierManager) Get(ctx context.Context, tier TierType, key []byte) ([]byte, error) {
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return tm.dbs[tier].IStore.Get(ctx, key)
+}
+func (tm *TierManager) Delete(ctx context.Context, tier TierType, key []byte) error {
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return tm.dbs[tier].IStore.Delete(ctx, key)
+}
+func (tm *TierManager) BatchPut(ctx context.Context, tier TierType, key []byte, value []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if tm.dbs[tier].IBatch == nil {
+		tm.dbs[tier].IBatch = tm.dbs[tier].IStore.Batch()
+	}
+	return tm.dbs[tier].IBatch.Put(key, value)
+}
+func (tm *TierManager) BatchDelete(ctx context.Context, tier TierType, key []byte, value []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if tm.dbs[tier].IBatch == nil {
+		tm.dbs[tier].IBatch = tm.dbs[tier].IStore.Batch()
+	}
+	return tm.dbs[tier].IBatch.Delete(key)
+}
+func (tm *TierManager) Commit(ctx context.Context, tier TierType) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if tm.dbs[tier].IBatch == nil {
+		tm.dbs[tier].IBatch = tm.dbs[tier].IStore.Batch()
+		return nil
+	}
+	err := tm.dbs[tier].IBatch.Commit(ctx)
+	if err != nil {
+		return err
+	}
+	tm.dbs[tier].IBatch = nil
+	return nil
+}
+
 // NewStorage creates a new storage instance based on the given database name and configuration
 func NewStorage(dbname string, config Tconfigs) (zerokv.Core, error) {
 	switch dbname {
