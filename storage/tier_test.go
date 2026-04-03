@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/rawbytedev/aether/index"
 	"github.com/rawbytedev/aether/storage"
 )
 
@@ -37,5 +38,17 @@ func TestPut(t *testing.T) {
 	if err != nil {
 		t.Log(err)
 	}
+
 	t.Log(val)
+}
+
+func TestIdx(t *testing.T) {
+	idx, err := index.NewIndexService(index.IndexConfig{Dir: "./idx", Encoding: "json"})
+	if err != nil {
+		t.Log(err)
+	}
+	err = idx.Record([]byte{0x01, 0x02}, []byte{0x05, 0x50, 0x05, 0x20})
+	if err != nil {
+		t.Log(err)
+	}
 }
