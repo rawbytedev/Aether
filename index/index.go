@@ -126,7 +126,7 @@ func (ac *AccessEvent) UpdateTier(tier storage.TierType) {
 }
 
 func (ac *AccessEvent) Increment() {
-	ac.Score = +1
+	ac.Score += 1
 	ac.Accessed = time.Now()
 }
 

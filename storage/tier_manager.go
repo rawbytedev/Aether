@@ -57,15 +57,15 @@ func NewTierManager(config TierConfigs) (*TierManager, error) {
 }
 
 // Initialize initializes the storage tiers by creating the appropriate storage instances based on the configuration
-func (tm *TierManager) Initialize() (bool, error) {
+func (tm *TierManager) Initialize() error {
 	for _, db := range tm.dbs {
 		tmp, err := NewStorage(db.DBName, db.Configs)
 		if err != nil {
-			return false, err
+			return err
 		}
 		db.IStore = tmp
 	}
-	return true, nil
+	return nil
 }
 
 func (tm *TierManager) Put(ctx context.Context, tier TierType, key []byte, value []byte) error {
