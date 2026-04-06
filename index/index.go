@@ -19,6 +19,7 @@ type AccessEvent struct {
 }
 type MigrationEvent struct {
 	Key       []byte
+	Value     []byte
 	Prev_Tier storage.TierType
 	Tier      storage.TierType
 }
@@ -71,7 +72,26 @@ func (idx *IndexService) Record(key []byte, value []byte) error {
 	if err != nil {
 		return err
 	}
-	return idx.IStore.Put(context.Background(), key, val)
+	err = idx.IStore.Put(context.Background(), key, val)
+	if err != nil {
+		return err
+	}
+	idx.Migration <- &MigrationEvent{Key: key, Value: value, Tier: storage.TierNVMe}
+	return nil
+}
+
+func (idx *IndexService) Edit(key []byte, value []byte) error {
+	val, err := idx.IStore.Get(context.Background(), key)
+	if err != nil {
+		return err
+	}
+	Event := &AccessEvent{}
+	err = idx.IEncode.Decode(val, Event)
+	if err != nil {
+		return err
+	}
+	idx.Migration <- &MigrationEvent{Key: key, Value: value, Tier: Event.Tier}
+	return nil
 }
 
 func (idx *IndexService) UpdateTier(tier storage.TierType, ac *AccessEvent) error {
@@ -86,7 +106,7 @@ func (idx *IndexService) UpdateTier(tier storage.TierType, ac *AccessEvent) erro
 		ac.RollBack()
 		return err
 	}
-	//idx.Migration <- &MigrationEvent{ac.Key, ac.Tier, tier}
+	//idx.Migration <- &MigrationEvent{Key: ac.Key, Prev_Tier: ac.Tier, Tier: tier}
 	return nil
 }
 
